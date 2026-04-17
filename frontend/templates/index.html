@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ExamGuard — Secure Online Examination System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body class="auth-page">
+
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="brand-icon">🎓</div>
+      <h1>ExamGuard</h1>
+      <p class="brand-sub">AI-Powered Online Invigilation</p>
+    </div>
+
+    <!-- Tab switcher -->
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-login" onclick="showTab('login')">Login</button>
+      <button class="tab-btn" id="tab-register" onclick="showTab('register')">Register</button>
+    </div>
+
+    <!-- ── Login form ─────────────────────────────────────────────── -->
+    <form id="login-form" class="auth-form">
+      <div class="form-group">
+        <label>Student ID</label>
+        <input type="text" id="login-sid" placeholder="e.g. 2024CS001" required />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="login-pwd" placeholder="••••••••" required />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+      <p class="hint">Admin? Use student ID <code>admin</code> / password <code>admin123</code></p>
+    </form>
+
+    <!-- ── Register form ─────────────────────────────────────────── -->
+    <form id="register-form" class="auth-form hidden">
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="reg-name" placeholder="Your legal name" required />
+      </div>
+      <div class="form-group">
+        <label>Student ID</label>
+        <input type="text" id="reg-sid" placeholder="e.g. 2024CS001" required />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="reg-pwd" placeholder="Choose a password" required />
+      </div>
+
+      <!-- Webcam face capture for registration -->
+      <div class="form-group">
+        <label>Face Registration (required for identity verification)</label>
+        <div class="webcam-box">
+          <video id="reg-video" autoplay muted playsinline></video>
+          <canvas id="reg-canvas" class="hidden"></canvas>
+          <div id="reg-face-status" class="face-status">Click "Capture" to register your face</div>
+        </div>
+        <div class="webcam-controls">
+          <button type="button" class="btn btn-outline" id="reg-start-cam">Start Camera</button>
+          <button type="button" class="btn btn-secondary" id="reg-capture" disabled>📷 Capture</button>
+          <span id="reg-capture-ok" class="badge-ok hidden">✓ Face captured</span>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+    </form>
+
+    <div id="auth-message" class="message hidden"></div>
+  </div>
+</div>
+
+<script>
+  // ─── Tab switching ────────────────────────────────────────────────────────
+  function showTab(tab) {
+    document.getElementById("login-form").classList.toggle("hidden", tab !== "login");
+    document.getElementById("register-form").classList.toggle("hidden", tab !== "register");
+    document.getElementById("tab-login").classList.toggle("active", tab === "login");
+    document.getElementById("tab-register").classList.toggle("active", tab === "register");
+  }
+
+  // ─── Webcam for registration ──────────────────────────────────────────────
+  let regStream = null;
+  let capturedFrame = null;
+
+  document.getElementById("reg-start-cam").addEventListener("click", async () => {
+    try {
+      regStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      document.getElementById("reg-video").srcObject = regStream;
+      document.getElementById("reg-capture").disabled = false;
+      document.getElementById("reg-face-status").textContent = "Camera active — centre your face";
+    } catch (e) {
+      showMessage("Camera access denied: " + e.message, "error");
+    }
+  });
+
+  document.getElementById("reg-capture").addEventListener("click", () => {
+    const video  = document.getElementById("reg-video");
+    const canvas = document.getElementById("reg-canvas");
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    capturedFrame = canvas.toDataURL("image/jpeg", 0.8);
+    document.getElementById("reg-face-status").textContent = "Face snapshot taken ✓";
+    document.getElementById("reg-capture-ok").classList.remove("hidden");
+    if (regStream) { regStream.getTracks().forEach(t => t.stop()); }
+  });
+
+  // ─── Login submit ─────────────────────────────────────────────────────────
+  document.getElementById("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const sid = document.getElementById("login-sid").value.trim();
+    const pwd = document.getElementById("login-pwd").value;
+
+    const resp = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ student_id: sid, password: pwd }),
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      showMessage("Login successful — redirecting…", "success");
+      setTimeout(() => {
+        window.location.href = data.is_admin ? "/admin" : "/exam";
+      }, 800);
+    } else {
+      showMessage(data.error || "Login failed.", "error");
+    }
+  });
+
+  // ─── Register submit ──────────────────────────────────────────────────────
+  document.getElementById("register-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name  = document.getElementById("reg-name").value.trim();
+    const sid   = document.getElementById("reg-sid").value.trim();
+    const pwd   = document.getElementById("reg-pwd").value;
+
+    const resp = await fetch("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        student_id:  sid,
+        name:        name,
+        password:    pwd,
+        face_frame:  capturedFrame || "",
+      }),
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      showMessage("Account created! " +
+        (data.face_registered ? "Face registered." : "Warning: face not registered.") +
+        " Please log in.", "success");
+      setTimeout(() => showTab("login"), 1500);
+    } else {
+      showMessage(data.error || "Registration failed.", "error");
+    }
+  });
+
+  function showMessage(msg, type) {
+    const el = document.getElementById("auth-message");
+    el.textContent = msg;
+    el.className = "message " + type;
+    el.classList.remove("hidden");
+    setTimeout(() => el.classList.add("hidden"), 5000);
+  }
+
+  // Auto-create admin account on page load (demo only)
+  fetch("/api/admin/register_admin", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ student_id: "admin", password: "admin123" }),
+  });
+</script>
+</body>
+</html>

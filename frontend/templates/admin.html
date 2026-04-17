@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ExamGuard — Admin Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body class="admin-page">
+
+<header class="admin-header">
+  <div class="brand-sm">🎓 ExamGuard — Admin Dashboard</div>
+  <div class="admin-controls">
+    <span id="live-badge" class="badge-live">● LIVE</span>
+    <button class="btn btn-outline btn-sm" onclick="refreshAll()">↻ Refresh</button>
+    <a href="/api/logout" class="btn btn-outline btn-sm">Logout</a>
+  </div>
+</header>
+
+<main class="admin-main">
+
+  <!-- Summary cards -->
+  <section class="summary-row" id="summary-row">
+    <div class="summary-card">
+      <div class="summary-val" id="count-active">0</div>
+      <div class="summary-label">Active Sessions</div>
+    </div>
+    <div class="summary-card warn">
+      <div class="summary-val" id="count-warned">0</div>
+      <div class="summary-label">Warned</div>
+    </div>
+    <div class="summary-card flag">
+      <div class="summary-val" id="count-flagged">0</div>
+      <div class="summary-label">Flagged</div>
+    </div>
+    <div class="summary-card danger">
+      <div class="summary-val" id="count-suspended">0</div>
+      <div class="summary-label">Suspended</div>
+    </div>
+  </section>
+
+  <!-- Student cards grid -->
+  <section class="student-grid" id="student-grid">
+    {% if students %}
+      {% for s in students %}
+      <div class="student-card" id="card-{{ s.student_id }}"
+           data-risk="{{ s.risk.fused }}">
+        <div class="card-header">
+          <span class="card-sid">{{ s.student_id }}</span>
+          <span class="card-action action-{{ s.risk.action|lower }}">
+            {{ s.risk.action }}
+          </span>
+          {% if s.suspended %}
+          <span class="card-suspended-badge">SUSPENDED</span>
+          {% endif %}
+        </div>
+        <div class="risk-bar-wrap">
+          <div class="risk-bar" style="width: {{ (s.risk.fused * 100)|int }}%"></div>
+        </div>
+        <div class="card-risk-val">Risk: {{ (s.risk.fused * 100)|round(1) }}%</div>
+        <div class="agent-grid">
+          <div class="agent-score" title="Identity Agent">
+            ID <span>{{ (s.risk.identity * 100)|round(0)|int }}%</span>
+          </div>
+          <div class="agent-score" title="Gaze Agent">
+            👁 <span>{{ (s.risk.gaze * 100)|round(0)|int }}%</span>
+          </div>
+          <div class="agent-score" title="Behaviour Agent">
+            🔍 <span>{{ (s.risk.behaviour * 100)|round(0)|int }}%</span>
+          </div>
+          <div class="agent-score" title="Integrity Agent">
+            🔒 <span>{{ (s.risk.integrity * 100)|round(0)|int }}%</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">No active exam sessions yet.</div>
+    {% endif %}
+  </section>
+
+  <!-- Live event feed -->
+  <section class="event-feed-panel">
+    <h2>Live Event Feed</h2>
+    <div class="event-feed" id="event-feed">
+      <div class="feed-placeholder">Waiting for events…</div>
+    </div>
+  </section>
+
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.0/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='js/admin_dashboard.js') }}"></script>
+</body>
+</html>

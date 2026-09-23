@@ -1,0 +1,23 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Environments
+.env
+.venv
+env/
+venv/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# --- Sensitive data: never commit these ---
+data/registered_faces/
+data/ssl/
+data/users.json
+
+# Large pretrained model weights (download separately, see README)
+data/models/*.weights
+data/models/*.caffemodel
